@@ -45,6 +45,8 @@ export default function BarangDetailPage() {
       const fd = new FormData()
       fd.append('foto_ktm', ktmFile)
       fd.append('keterangan', keterangan)
+      //nambahin id dari barang
+      fd.append('laporan', laporanId)
       await klaimAPI.ajukan(laporanId, fd)
       toast.success('Klaim berhasil diajukan! Tunggu verifikasi dari penemu.')
       setKlaimMode(false)
