@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from '@/store/authStore'
 import Layout         from '@/components/Layout'
@@ -17,8 +16,7 @@ import NotifikasiPage from '@/pages/NotifikasiPage'
 import ProfilPage     from '@/pages/ProfilPage'
 
 export default function App() {
-  const { init, isLoading } = useAuthStore()
-  useEffect(() => { init() }, [init])
+  const { isLoading } = useAuthStore()
 
   if (isLoading) return <LoadingPage />
 

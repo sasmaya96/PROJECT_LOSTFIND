@@ -4,18 +4,7 @@ import { authAPI } from '@/services/api'
 const useAuthStore = create((set) => ({
   user:            null,
   isAuthenticated: false,
-  isLoading:       true,
-
-  init: async () => {
-    if (!localStorage.getItem('access')) { set({ isLoading: false }); return }
-    try {
-      const { data } = await authAPI.profile()
-      set({ user: data, isAuthenticated: true, isLoading: false })
-    } catch {
-      localStorage.clear()
-      set({ isLoading: false })
-    }
-  },
+  isLoading:       false,
 
   login: async (email, password) => {
     const { data } = await authAPI.login({ email, password })
