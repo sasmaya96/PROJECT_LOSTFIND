@@ -126,7 +126,9 @@ class LaporanDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return None
-        klaim = obj.klaim.filter(pengklaim=request.user).first()
+        klaim = obj.klaim.filter(
+            pengklaim=request.user
+        ).exclude(status='ditolak').order_by('-updated_at').first()
         if klaim:
             return {'id': klaim.id, 'status': klaim.status}
         return None
@@ -172,17 +174,35 @@ class KlaimSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f'Barang ini sudah berstatus "{laporan.get_status_display()}".'
             )
-        if KlaimBarang.objects.filter(laporan=laporan, pengklaim=user).exists():
+        ada_klaim_non_ditolak = KlaimBarang.objects.filter(
+            laporan=laporan,
+            pengklaim=user
+        ).exclude(status='ditolak').exists()
+        if ada_klaim_non_ditolak:
             raise serializers.ValidationError('Anda sudah pernah mengajukan klaim untuk barang ini.')
         return laporan
 
     def create(self, validated_data):
         validated_data['pengklaim'] = self.context['request'].user
-        klaim = super().create(validated_data)
+        laporan = validated_data['laporan']
+        pengklaim = validated_data['pengklaim']
 
-        # Ubah status laporan jadi 'proses'
-        klaim.laporan.status = 'proses'
-        klaim.laporan.save(update_fields=['status', 'updated_at'])
+        # Jika klaim sebelumnya ditolak, pakai record lama agar user bisa ajukan ulang.
+        klaim_lama = KlaimBarang.objects.filter(
+            laporan=laporan,
+            pengklaim=pengklaim,
+            status='ditolak'
+        ).order_by('-updated_at').first()
+
+        if klaim_lama:
+            klaim_lama.foto_ktm = validated_data['foto_ktm']
+            klaim_lama.keterangan = validated_data.get('keterangan', '')
+            klaim_lama.status = 'menunggu'
+            klaim_lama.catatan_admin = ''
+            klaim_lama.save(update_fields=['foto_ktm', 'keterangan', 'status', 'catatan_admin', 'updated_at'])
+            klaim = klaim_lama
+        else:
+            klaim = super().create(validated_data)
 
         # Kirim notifikasi ke pelapor
         Notifikasi.objects.create(
@@ -205,8 +225,32 @@ class KlaimVerifikasiSerializer(serializers.Serializer):
 # ── Notifikasi ────────────────────────────────────────────────────────────────
 
 class NotifikasiSerializer(serializers.ModelSerializer):
+    ruang_chat_id = serializers.SerializerMethodField()
+
     class Meta:
         model  = Notifikasi
         fields = ['id', 'judul', 'pesan', 'tipe', 'laporan',
-                  'sudah_dibaca', 'created_at']
+                  'ruang_chat_id', 'sudah_dibaca', 'created_at']
         read_only_fields = fields
+
+    def get_ruang_chat_id(self, obj):
+        """
+        Untuk notifikasi pesan, kirim ID ruang chat agar frontend bisa
+        langsung membuka percakapan yang relevan.
+        """
+        if obj.tipe != 'pesan_baru':
+            return None
+
+        from chat.models import RuangChat
+
+        qs = RuangChat.objects.filter(peserta=obj.user)
+        if obj.laporan_id:
+            qs = qs.filter(laporan_id=obj.laporan_id)
+
+        prefix = 'Pesan baru dari '
+        if obj.judul.startswith(prefix):
+            nama_pengirim = obj.judul[len(prefix):].strip()
+            if nama_pengirim:
+                qs = qs.filter(peserta__nama_lengkap=nama_pengirim).exclude(peserta=obj.user)
+
+        return qs.order_by('-updated_at').values_list('id', flat=True).distinct().first()

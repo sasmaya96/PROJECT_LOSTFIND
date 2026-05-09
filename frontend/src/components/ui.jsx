@@ -11,9 +11,10 @@ export function BadgeJenis({ jenis }) {
 }
 
 export function BadgeStatus({ status }) {
-  const cls = { aktif:'badge-aktif', proses:'badge-proses', diambil:'badge-diambil' }
-  const lbl = { aktif:'Aktif', proses:'Dalam Proses', diambil:'Barang Telah Diambil' }
-  return <span className={cls[status] ?? 'badge-aktif'}>{lbl[status] ?? status}</span>
+  const normalized = status === 'proses' ? 'aktif' : status
+  const cls = { aktif:'badge-aktif', diambil:'badge-diambil' }
+  const lbl = { aktif:'Aktif', diambil:'Barang Telah Diambil' }
+  return <span className={cls[normalized] ?? 'badge-aktif'}>{lbl[normalized] ?? normalized}</span>
 }
 
 // ── Item Card ─────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ export function ItemCard({ item }) {
         <div className="absolute top-2 left-2 flex gap-1">
           <BadgeJenis jenis={item.jenis} />
         </div>
-        {item.status !== 'aktif' && (
+        {item.status === 'diambil' && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <BadgeStatus status={item.status} />
           </div>

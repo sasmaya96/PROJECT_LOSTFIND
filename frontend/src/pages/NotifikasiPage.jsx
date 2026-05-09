@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Bell, CheckCheck, Package, MessageCircle, ShieldCheck, Info } from 'lucide-react'
-import { notifAPI } from '@/services/api'
+import { notifAPI, chatAPI } from '@/services/api'
 import { EmptyState, LoadingPage } from '@/components/ui'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -16,6 +16,7 @@ const TIPE_ICON = {
 }
 
 export default function NotifikasiPage() {
+  const navigate = useNavigate()
   const [notifs,   setNotifs]   = useState([])
   const [loading,  setLoading]  = useState(true)
 
@@ -41,6 +42,40 @@ export default function NotifikasiPage() {
   }
 
   const unreadCount = notifs.filter((n) => !n.sudah_dibaca).length
+
+  const getSenderNameFromNotif = (judul = '') => {
+    const prefix = 'Pesan baru dari '
+    return judul.startsWith(prefix) ? judul.slice(prefix.length).trim() : ''
+  }
+
+  const handleOpenNotif = async (notif) => {
+    if (!notif.sudah_dibaca) await handleBaca(notif.id)
+
+    if (notif.tipe === 'pesan_baru') {
+      let ruangId = notif.ruang_chat_id
+      if (!ruangId) {
+        try {
+          const { data } = await chatAPI.daftarRuang()
+          const ruangs = data.results ?? data
+          const senderName = getSenderNameFromNotif(notif.judul).toLowerCase()
+          const match = ruangs.find((r) => {
+            const lawans = (r.peserta ?? []).filter((p) => p.nama_lengkap)
+            return lawans.some((p) => p.nama_lengkap.toLowerCase() === senderName)
+          })
+          ruangId = match?.id ?? null
+        } catch {
+          ruangId = null
+        }
+      }
+
+      navigate('/chat', { state: ruangId ? { ruangId } : undefined })
+      return
+    }
+
+    if (notif.laporan) {
+      navigate(`/barang/${notif.laporan}`)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
@@ -70,7 +105,7 @@ export default function NotifikasiPage() {
             const Icon    = tipe.icon
             return (
               <div key={n.id}
-                onClick={() => { if (!n.sudah_dibaca) handleBaca(n.id) }}
+                onClick={() => handleOpenNotif(n)}
                 className={`flex gap-4 p-4 rounded-2xl border transition-colors cursor-pointer
                   ${n.sudah_dibaca
                     ? 'bg-white border-gray-100 hover:bg-gray-50'
@@ -95,7 +130,15 @@ export default function NotifikasiPage() {
                   <p className="text-xs text-gray-400 mt-1.5">
                     {format(new Date(n.created_at), 'd MMM yyyy, HH:mm', { locale: id })}
                   </p>
-                  {n.laporan && (
+                  {n.tipe === 'pesan_baru' && n.ruang_chat_id && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleOpenNotif(n) }}
+                      className="text-xs text-primary-600 hover:underline mt-1 inline-block">
+                      Buka chat →
+                    </button>
+                  )}
+                  {n.tipe !== 'pesan_baru' && n.laporan && (
                     <Link to={`/barang/${n.laporan}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-xs text-primary-600 hover:underline mt-1 inline-block">

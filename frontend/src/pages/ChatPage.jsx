@@ -30,6 +30,12 @@ export default function ChatPage() {
       .finally(() => setLoadingRuang(false))
   }, [])
 
+  const markRuangAsRead = useCallback((ruangId) => {
+    setRuangs((prev) => prev.map((r) => (
+      r.id === ruangId ? { ...r, jumlah_belum_dibaca: 0 } : r
+    )))
+  }, [])
+
   useEffect(() => { fetchRuangs() }, [fetchRuangs])
 
   // Buka ruang dari state navigasi (misal dari halaman detail barang)
@@ -54,12 +60,19 @@ export default function ChatPage() {
 
     setMessages([])
     setActiveRuang(ruangId)
+    markRuangAsRead(ruangId)
     setWsStatus('connecting')
 
     const ws = bukaWsChat(ruangId)
     wsRef.current = ws
 
-    ws.onopen = () => setWsStatus('open')
+    ws.onopen = () => {
+      setWsStatus('open')
+      // Saat ruang dibuka, tandai pesan lawan sebagai sudah dibaca.
+      ws.send(JSON.stringify({ type: 'baca' }))
+      markRuangAsRead(ruangId)
+      fetchRuangs()
+    }
 
     ws.onmessage = (e) => {
       const data = JSON.parse(e.data)
