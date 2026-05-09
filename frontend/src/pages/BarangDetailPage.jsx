@@ -22,6 +22,8 @@ export default function BarangDetailPage() {
   const [klaimMode, setKlaimMode] = useState(false)
   const [ktmFile,   setKtmFile]   = useState(null)
   const [ktmPrev,   setKtmPrev]   = useState(null)
+  const [barangFile, setBarangFile] = useState(null)
+  const [barangPrev, setBarangPrev] = useState(null)
   const [keterangan, setKeterangan] = useState('')
   const [submitting,  setSubmitting] = useState(false)
 
@@ -38,18 +40,29 @@ export default function BarangDetailPage() {
       .finally(() => setLoading(false))
   }, [laporanId, isAuthenticated])
 
+  const resetFormKlaim = () => {
+    setKlaimMode(false)
+    setKtmFile(null)
+    setKtmPrev(null)
+    setBarangFile(null)
+    setBarangPrev(null)
+    setKeterangan('')
+  }
+
   const handleKlaimSubmit = async () => {
     if (!ktmFile) { toast.error('Upload foto KTM terlebih dahulu.'); return }
+    if (!barangFile) { toast.error('Upload foto barang terlebih dahulu.'); return }
     setSubmitting(true)
     try {
       const fd = new FormData()
       fd.append('foto_ktm', ktmFile)
+      fd.append('foto_barang', barangFile)
       fd.append('keterangan', keterangan)
       //nambahin id dari barang
       fd.append('laporan', laporanId)
       await klaimAPI.ajukan(laporanId, fd)
       toast.success('Klaim berhasil diajukan! Tunggu verifikasi dari penemu.')
-      setKlaimMode(false)
+      resetFormKlaim()
       // refresh
       const l = await barangAPI.getById(laporanId)
       setLaporan(l.data)
@@ -129,19 +142,19 @@ export default function BarangDetailPage() {
             </div>
           </div>
 
-          {laporan.kontak_wa && (
-            <a href={`https://wa.me/${laporan.kontak_wa}`} target="_blank" rel="noreferrer"
-              className="btn bg-green-500 hover:bg-green-600 text-white w-fit">
-              <Phone size={15} /> Hubungi via WhatsApp
-            </a>
-          )}
-
-          {/* Tombol Chat dengan pelapor */}
-          {isAuthenticated && !isOwner && (
-            <button onClick={() => handleBukaChat(laporan.pelapor?.id)} className="btn-secondary w-fit">
-              <MessageCircle size={15} /> Chat dengan {laporan.pelapor?.nama_lengkap}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {laporan.kontak_wa && (
+              <a href={`https://wa.me/${laporan.kontak_wa}`} target="_blank" rel="noreferrer"
+                className="btn bg-green-500 hover:bg-green-600 text-white w-fit">
+                <Phone size={15} /> Hubungi via WhatsApp
+              </a>
+            )}
+            {isAuthenticated && !isOwner && (
+              <button type="button" onClick={() => handleBukaChat(laporan.pelapor?.id)} className="btn-secondary w-fit">
+                <MessageCircle size={15} /> Chat dengan {laporan.pelapor?.nama_lengkap}
+              </button>
+            )}
+          </div>
 
           {/* Klaim — hanya tampil jika bukan owner & status aktif */}
           {isAuthenticated && !isOwner && laporan.status === 'aktif' && (
@@ -170,6 +183,18 @@ export default function BarangDetailPage() {
                           onChange={(e) => { const f = e.target.files[0]; if (f) { setKtmFile(f); setKtmPrev(URL.createObjectURL(f)) } }} />
                       </label>
                     )}
+                  <h3 className="font-semibold text-gray-800 text-sm pt-1">Upload foto barang</h3>
+                  <p className="text-xs text-gray-500">Tunjukkan barang yang Anda klaim (misal dari sudut yang sama dengan laporan).</p>
+                  {barangPrev
+                    ? <img src={barangPrev} alt="Barang" className="h-32 rounded-xl object-cover border" />
+                    : (
+                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-xl p-6 cursor-pointer hover:bg-blue-100 transition-colors">
+                        <Upload size={24} className="text-blue-400 mb-2" />
+                        <span className="text-xs text-blue-600 font-medium">Klik untuk upload foto barang</span>
+                        <input type="file" accept="image/*" className="sr-only"
+                          onChange={(e) => { const f = e.target.files[0]; if (f) { setBarangFile(f); setBarangPrev(URL.createObjectURL(f)) } }} />
+                      </label>
+                    )}
                   <textarea className="input resize-none" rows={3}
                     placeholder="Jelaskan ciri khas barang Anda untuk membuktikan kepemilikan..."
                     value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
@@ -177,7 +202,7 @@ export default function BarangDetailPage() {
                     <button onClick={handleKlaimSubmit} disabled={submitting} className="btn-primary flex-1 justify-center">
                       {submitting ? 'Mengirim...' : 'Kirim Klaim'}
                     </button>
-                    <button onClick={() => { setKlaimMode(false); setKtmFile(null); setKtmPrev(null) }}
+                    <button type="button" onClick={resetFormKlaim}
                       className="btn-secondary">Batal</button>
                   </div>
                 </div>
@@ -194,8 +219,12 @@ export default function BarangDetailPage() {
           <div className="space-y-4">
             {klaims.map((k) => (
               <div key={k.id} className="card flex flex-col sm:flex-row gap-4">
-                {/* Foto KTM */}
-                <img src={k.foto_ktm_url} alt="KTM" className="w-32 h-24 object-cover rounded-xl flex-shrink-0" />
+                <div className="flex gap-2 flex-shrink-0">
+                  <img src={k.foto_ktm_url} alt="KTM" className="w-32 h-24 object-cover rounded-xl border" />
+                  {k.foto_barang_url && (
+                    <img src={k.foto_barang_url} alt="Barang" className="w-32 h-24 object-cover rounded-xl border" />
+                  )}
+                </div>
                 <div className="flex-1 space-y-1">
                   <p className="font-semibold text-gray-800">{k.pengklaim?.nama_lengkap}</p>
                   <p className="text-sm text-gray-500">{k.keterangan || 'Tidak ada keterangan tambahan.'}</p>

@@ -143,20 +143,30 @@ class LaporanDetailSerializer(serializers.ModelSerializer):
 class KlaimSerializer(serializers.ModelSerializer):
     pengklaim    = UserPublicSerializer(read_only=True)
     foto_ktm_url = serializers.SerializerMethodField()
+    foto_barang_url = serializers.SerializerMethodField()
     laporan_info = serializers.SerializerMethodField()
 
     class Meta:
         model  = KlaimBarang
         fields = ['id', 'laporan', 'laporan_info', 'pengklaim', 'foto_ktm',
-                  'foto_ktm_url', 'keterangan', 'status', 'catatan_admin',
-                  'created_at', 'updated_at']
+                  'foto_ktm_url', 'foto_barang', 'foto_barang_url', 'keterangan',
+                  'status', 'catatan_admin', 'created_at', 'updated_at']
         read_only_fields = ['id', 'pengklaim', 'status', 'catatan_admin',
-                            'created_at', 'updated_at']
+                            'created_at', 'updated_at', 'foto_barang_url', 'foto_ktm_url']
+        extra_kwargs = {
+            'foto_barang': {'write_only': True},
+        }
 
     def get_foto_ktm_url(self, obj):
         request = self.context.get('request')
         if obj.foto_ktm and request:
             return request.build_absolute_uri(obj.foto_ktm.url)
+        return None
+
+    def get_foto_barang_url(self, obj):
+        request = self.context.get('request')
+        if getattr(obj, 'foto_barang', None) and request:
+            return request.build_absolute_uri(obj.foto_barang.url)
         return None
 
     def get_laporan_info(self, obj):
@@ -182,6 +192,11 @@ class KlaimSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Anda sudah pernah mengajukan klaim untuk barang ini.')
         return laporan
 
+    def validate(self, attrs):
+        if not attrs.get('foto_barang'):
+            raise serializers.ValidationError({'foto_barang': 'Upload foto barang wajib diisi.'})
+        return attrs
+
     def create(self, validated_data):
         validated_data['pengklaim'] = self.context['request'].user
         laporan = validated_data['laporan']
@@ -196,10 +211,13 @@ class KlaimSerializer(serializers.ModelSerializer):
 
         if klaim_lama:
             klaim_lama.foto_ktm = validated_data['foto_ktm']
+            klaim_lama.foto_barang = validated_data['foto_barang']
             klaim_lama.keterangan = validated_data.get('keterangan', '')
             klaim_lama.status = 'menunggu'
             klaim_lama.catatan_admin = ''
-            klaim_lama.save(update_fields=['foto_ktm', 'keterangan', 'status', 'catatan_admin', 'updated_at'])
+            klaim_lama.save(update_fields=[
+                'foto_ktm', 'foto_barang', 'keterangan', 'status', 'catatan_admin', 'updated_at'
+            ])
             klaim = klaim_lama
         else:
             klaim = super().create(validated_data)

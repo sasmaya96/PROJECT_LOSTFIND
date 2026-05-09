@@ -130,6 +130,10 @@ class KlaimBarang(models.Model):
                                      related_name='klaim_saya')
     foto_ktm     = models.ImageField(upload_to='ktm/%Y/%m/',
                                      help_text='Foto KTM/KTP sebagai bukti identitas')
+    foto_barang  = models.ImageField(upload_to='klaim-barang/%Y/%m/',
+                                     blank=True,
+                                     null=True,
+                                     help_text='Foto barang sebagai bukti kecocokan dengan laporan')
     keterangan   = models.TextField(blank=True,
                                     help_text='Jelaskan ciri khas barang untuk verifikasi')
     status       = models.CharField(max_length=15, choices=STATUS_CHOICES, default='menunggu')
@@ -186,6 +190,16 @@ class KlaimBarang(models.Model):
             tipe    = 'klaim_ditolak',
             laporan = self.laporan,
         )
+
+        # Tanpa klaim lain yang masih menunggu, kembalikan status laporan ke aktif
+        # agar pengguna lain bisa mengajukan klaim (mis. data lama berstatus proses).
+        masih_menunggu = KlaimBarang.objects.filter(
+            laporan=self.laporan,
+            status='menunggu',
+        ).exists()
+        if not masih_menunggu and self.laporan.status == 'proses':
+            self.laporan.status = 'aktif'
+            self.laporan.save(update_fields=['status', 'updated_at'])
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -57,7 +57,7 @@ class KlaimBarangAdmin(admin.ModelAdmin):
     list_display  = ['laporan', 'pengklaim', 'status', 'preview_ktm', 'created_at']
     list_filter   = ['status']
     search_fields = ['laporan__judul', 'pengklaim__nama_lengkap']
-    readonly_fields = ['laporan', 'pengklaim', 'foto_ktm', 'keterangan', 'created_at']
+    readonly_fields = ['laporan', 'pengklaim', 'foto_ktm', 'foto_barang', 'keterangan', 'created_at']
     actions       = ['action_approve', 'action_reject']
 
     def preview_ktm(self, obj):
